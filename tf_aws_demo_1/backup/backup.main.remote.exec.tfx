@@ -1,0 +1,87 @@
+provider "aws" {
+  region = "us-east-2"
+  shared_credentials_file = ".aws/credentials"
+}
+
+resource "aws_key_pair" "tf_aws_demo_1" {
+  key_name   = "tf_aws_demo_1"
+  public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC2bmr+Y+fDbDJ5oV7hZDG3wUM0ftpbNSvz5BlBNJYUy8LF5wiUDdlG1Ht/zk5A0CoFHB6lXOsOUrlApsHA4/lseKq9Xs8z2Vv4XIYhfn2FUUxIXnXqmQBUqHo3PHaDFJ0GJnhHu4yPFVFRrGnnlzGdneChcHpuxky7AD8lFYc4zELQdmKYTToB+rbgrCgcZEZQ8/HcLD95G6Y5U59zQVzPuBXY4QMdO4KP3Pwtg9b1jS5RYxTvb1OfoYW/JDcnNnGpEn9+CnVeZHjCob2WNHGw/3XNZTrGhTN/8iABP6lJYWSJHx0U2pIiRp63lfQXT+ZSWlHu/+d7Rchp0NmyJRlb tf_aws_demo_1_ssh_key"
+}
+
+
+resource "aws_instance" "tf_aws_demo_1" {
+  ami = "ami-af122bca"
+  instance_type = "t2.micro"
+  vpc_security_group_ids = ["${aws_security_group.tf_aws_demo_1.id}"]
+  key_name = "tf_aws_demo_1"
+  tags {
+    Name = "tf_aws_demo_1"
+  }
+
+  provisioner "file" {
+    source      = "docs/index.html"
+    destination = "/home/ubuntu/index.html"
+
+    connection {
+        type = "ssh"
+        host = "${self.public_ip}"
+        user = "ubuntu"
+        private_key = "${file("keys/tf_aws_demo_1")}"
+        timeout = "30s"
+     }
+  }
+
+  provisioner "file" {
+    source      = "busybox.sh"
+    destination = "/home/ubuntu/busybox.sh"
+
+    connection {
+        type = "ssh"
+        host = "${self.public_ip}"
+        user = "ubuntu"
+        private_key = "${file("keys/tf_aws_demo_1")}"
+        timeout = "30s"
+     }
+  }
+
+  provisioner "remote-exec" {
+     inline = [ "chmod 755 /home/ubuntu/busybox.sh","/home/ubuntu/busybox.sh > /home/ubuntu/run.out" ]
+
+      connection {
+        type = "ssh"
+        host = "${self.public_ip}"
+        user = "ubuntu"
+        private_key = "${file("keys/tf_aws_demo_1")}"
+        timeout = "30s"
+      }
+  }
+}
+
+resource "aws_security_group" "tf_aws_demo_1" {
+  name = "tf_aws_demo_1"
+
+  ingress {
+    from_port = 8080
+    to_port = 8080
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port = 22
+    to_port = 22
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port = 0
+    to_port = 0
+    protocol = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+output "public_dns" {
+  value = "${aws_instance.tf_aws_demo_1.public_dns}:8080"
+}
